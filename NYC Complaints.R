@@ -10,7 +10,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 #read table
 df <- read.csv("NYPD_Complaint_Data_Current__Year_To_Date__20240531.csv") %>%
-  subset(., Latitude != 0, select = c(CMPLNT_NUM, BORO_NM, CMPLNT_FR_DT, LAW_CAT_CD, OFNS_DESC, Latitude, Longitude)) %>%
+  subset(., Y_COORD_CD != 0, select = c(CMPLNT_NUM, BORO_NM, CMPLNT_FR_DT, LAW_CAT_CD, OFNS_DESC, X_COORD_CD, Y_COORD_CD)) %>%
   na.omit(.) 
 
 #date format  
@@ -25,9 +25,9 @@ table(df$OFNS_DESC)
 
 #classify: offense
 df$class <- ifelse(df$OFNS_DESC == "ASSAULT 3 & RELATED OFFENSES" | 
-                   df$OFNS_DESC == "MURDER & NON-NEGL. MANSLAUGHTER" |
-                   df$OFNS_DESC == "RAPE" |
-                   df$OFNS_DESC == "ROBBERY"
+                     df$OFNS_DESC == "MURDER & NON-NEGL. MANSLAUGHTER" |
+                     df$OFNS_DESC == "RAPE" |
+                     df$OFNS_DESC == "ROBBERY"
                    , 1, 0)
 
 #offense frequency
@@ -38,64 +38,117 @@ df <- df %>%
   subset(., BORO_NM == "MANHATTAN")
 
 #separate
-df_0 <- subset(df, class == 0)  # control, non-violent
-df_1 <- subset(df, class == 1)  # case, violent
+df_0 <- subset(df, class == 0) 
+df_1 <- subset(df, class == 1) 
 
 #read NYC boundary
 geom <- st_read("nyc_boundary.shp") %>%
+  st_transform(., crs = 2263) %>%
   st_coordinates(.) %>%
   as.data.frame(.) %>%
   subset(., L2 == 79)   #Manhattan
 
 #ppp object window
 w <- owin(poly=list(x=rev(geom[, "X"]),y=rev(geom[, "Y"]))) #window
+plot(w)
 
 #ppp
-df_0_ppp <- ppp(df_0$Longitude, df_0$Latitude, window = w)
-df_1_ppp <- ppp(df_1$Longitude, df_1$Latitude, window = w)
+df_0_ppp <- ppp(df_0$X_COORD_CD, df_0$Y_COORD_CD, window = w)
+df_1_ppp <- ppp(df_1$X_COORD_CD, df_1$Y_COORD_CD, window = w)
 
-#kde 0: control
-g_tilde <- bivariate.density(pp=df_0_ppp, h0=OS(df_0_ppp)/2, adapt=FALSE, resolution=1500, verbose=TRUE, parallelise = 7)
-g_tilde
+# inspect and fix window
+W <- Window(df_1_ppp)
+wd <- as.data.frame(W)
+WFIX <- owin(poly=list(x=wd$x[wd$id==1],y=wd$y[wd$id==1]))
+plot(WFIX)
 
-#kde 1: case
-f_breve <- bivariate.density(pp=df_1_ppp, h0=OS(df_0_ppp)/2, adapt=FALSE, resolution=1500, verbose=TRUE, parallelise = 7)
+# inspect raw data (with fixed window)
+crppp <- ppp(x=c(df_0_ppp$x,df_1_ppp$x),
+             y=c(df_0_ppp$y,df_1_ppp$y),
+             marks=factor(rep(c("control","case"),c(npoints(df_0_ppp),npoints(df_1_ppp)))),
+             window=WFIX)
 
-#risk
-rho <- risk(f_breve, g_tilde, tolerate = TRUE)
+# create a slightly jittered version of the dataset (30-60 secs)
+crjit <- rshift(crppp,group=factor(1:npoints(crppp)),radius=0.001,edge="none")
+npoints(unique(unmark(crjit))) # Much better
 
-plot(rho, tol.show = TRUE)
+# examine and plot both objects (both have fixed window)
+par(mfrow=c(1,2))
+plot(crppp,cex=0.5,main="unjittered")
+plot(crjit,cex=0.5,main="jittered")
 
-#risk surface
-r <- raster(rho$rr)
-crs(r) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
-writeRaster(r, "rho_manhattan", format = "GTiff", overwrite=TRUE)
+# get an idea of suggested bandwidths by running several different selectors
+OS(crppp)
+NS(crjit) # OS bandwidths basically the same. Sample size is slightly different, but these are effectively equivalent
+#Comment AH:OS(crppp) = 2120.827 ftUS, NS(crjit) = 1955.452 ftUS. Are they still "basically the same"?
 
-#classify points
-rho.class <- tol.classify(rho, cutoff = 0.05)
+hk <- LSCV.risk(crjit,method="kelsall-diggle");hk #   886.727 ftUS
+hh <- LSCV.risk(crjit,method="hazelton");hh # 558.4516 ftUS
+hd <- LSCV.risk(crjit,method="davies");hd  # 408.6685 ftUS
 
-#cluster report table
-ID <- 1:length(rho.class[["finsplit"]])       #cluster identifier
-Cases <- lengths(rho.class[["finsplit"]])     #case count
-Controls <- lengths(rho.class[["ginsplit"]])  #control count
-N <- Cases + Controls                         #point count
-Risk <- Cases/N                               #
+hvrr1 <- risk(crjit,h0=886.727,tolerate=TRUE)  #using the Kelsall-Diggle bandwidth
+hvrr2 <- risk(crjit,adapt=TRUE,h0=886.727,tolerate=TRUE,pilot.symmetry="pooled", davies.baddeley=0.01) 
+hvrr1org <- risk(crppp,h0=886.727,tolerate=TRUE) # repeat the above using the original/unjittered data so we can compare the effect of the jittering
+hvrr2org <- risk(crppp,adapt=TRUE,h0=886.727,tolerate=TRUE,pilot.symmetry="pooled", davies.baddeley=0.01) 
 
-#contours to sf
-pcpolys <- rho.class$pcpolys %>%
-  lapply(., FUN = st_as_sf) %>%
-  do.call(rbind, .) %>%
-  st_set_crs(4326)
-pcpolys$ID <- 1:length(rho.class[["finsplit"]])
-st_write(pcpolys,"manhattan_pcpolys.shp", append = FALSE)
+#plot using Kelsall-Diggle
+par(mfrow=c(2,2))
+plot(hvrr1,main="fixed; h=886.727")
+plot(hvrr2,main="symmetric (pooled) adaptive; h0=hp=886.727; data jittered")
+plot(hvrr1org,main="(fixed using unjittered data)")
+plot(hvrr2org,main="(adaptive using unjittered data)")
 
-Area <- st_area(pcpolys) #Take care of units
-Case_density <- Cases/Area                    #
+# repeat these four estimates, using a larger bandwidth (around the size of the suggested OS bandwidth)
+hvrr1 <- risk(crjit,h0=2000,tolerate=TRUE)  #using the kelsall-diggle bandwidth for illustration
+hvrr2 <- risk(crjit,adapt=TRUE,h0=2000,tolerate=TRUE,pilot.symmetry="pooled", davies.baddeley=0.01) 
+hvrr1org <- risk(crppp,h0=2000,tolerate=TRUE) # repeat the above using the original/unjittered data so we can compare the effect of the jittering
+hvrr2org <- risk(crppp,adapt=TRUE,h0=2000,tolerate=TRUE,pilot.symmetry="pooled", davies.baddeley=0.01) 
 
-#style it
-df_res <- data.frame(ID, N, Cases, Controls, Risk, Case_density, Area) %>%
-  gt() %>%
-  gt_theme_nytimes() %>%
-  tab_header(title = "Clusters of Violent Crime in Manhattan")
-df_res
+#plot using larger bandwidth
+par(mfrow=c(2,2))
+plot(hvrr1,main="fixed; h=2000")
+plot(hvrr2,main="symmetric (pooled) adaptive; h0=hp=2000; data jittered")
+plot(hvrr1org,main="(fixed using unjittered data)")
+plot(hvrr2org,main="(adaptive using unjittered data)")
 
+#the larger bandwidth too large for my taste. The Kelsall-Diggle bandwidth or even the Hazelton or Davies bandwidths looks better.  
+
+
+# #risk surface
+# r <- raster(rho$rr)
+# crs(r) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+# writeRaster(r, "rho_manhattan", format = "GTiff", overwrite=TRUE)
+# 
+# #classify points
+# rho.class <- tol.classify(rho, cutoff = 0.05)
+# 
+# #plot
+# #plot(rho)
+# #points(rho.class$fin,col=2)
+# #points(rho.class$fout)
+# 
+# #cluster report table
+# ID <- 1:length(rho.class[["finsplit"]])       #cluster identifier
+# Cases <- lengths(rho.class[["finsplit"]])     #case count
+# Controls <- lengths(rho.class[["ginsplit"]])  #control count
+# N <- Cases + Controls                         #point count
+# Risk <- Cases/N                               #
+# 
+# #contours to sf
+# pcpolys <- rho.class$pcpolys %>%
+#   lapply(., FUN = st_as_sf) %>%
+#   do.call(rbind, .) %>%
+#   st_set_crs(4326)
+# pcpolys$ID <- 1:length(rho.class[["finsplit"]])
+# st_write(pcpolys,"manhattan_pcpolys.shp", append = FALSE)
+# 
+# Area <- st_area(pcpolys) #Take care of units
+# Case_density <- Cases/Area                    #
+# 
+# #style it
+# df_res <- data.frame(ID, N, Cases, Controls, Risk, Case_density, Area) %>%
+#   gt() %>%
+#   gt_theme_nytimes() %>%
+#   tab_header(title = "Clusters of Violent Crime in Manhattan")
+# df_res
+# 
