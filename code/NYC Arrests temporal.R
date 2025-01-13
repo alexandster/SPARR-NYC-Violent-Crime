@@ -83,7 +83,7 @@ time_slice <- function(df){
   writeRaster(r, paste0("../output/rho_", toString(df$month[1])), format = "GTiff", overwrite=TRUE)
   
   #classify points
-  # rho.class <- tol.classify(rho, cutoff = 0.05)
+  rho.class <- tol.classify(rho, cutoff = 0.05)
   # 
   # #cluster report table
   # ID <- 1:length(rho.class[["finsplit"]])       #cluster identifier
@@ -104,7 +104,7 @@ time_slice <- function(df){
 
 
 
-df[df$month > 7,] %>%
+df[df$month == 6,] %>%
   group_by(month) %>%
   do(time_slice(.))
   
