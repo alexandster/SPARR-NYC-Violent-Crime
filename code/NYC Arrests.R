@@ -75,7 +75,7 @@ rr_monthly <- lapply(ppjit01_monthly,risk,h0=2000,tolerate=TRUE)
 #small multiples plot: monthly clusters
 dev.off()
 #par(mfrow=c(4,3))
-for(i in 4:6){
+for(i in 1:5){
   print(i)
   plot(rr_monthly[[i]],main=names(rr_monthly)[i],tol.show=FALSE)
   tol.contour(rr_monthly[[i]]$P,levels=0.05,col="seagreen4",drawlabels=FALSE,add=TRUE,lwd=2)
