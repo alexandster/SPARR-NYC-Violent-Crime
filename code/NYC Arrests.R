@@ -5,8 +5,8 @@ library(gt)
 library(gtExtras)
 library(raster)
 library(ggplot2)
-library("geoR")  # for 'jitterDupCoords' function
-library("lubridate") # for 'month' and 'year'
+library(geoR)  # for 'jitterDupCoords' function
+library(lubridate) # for 'month' and 'year'
 
 
 # set workspace----
@@ -75,18 +75,32 @@ rr_monthly <- lapply(ppjit01_monthly,risk,h0=2000,tolerate=TRUE)
 #small multiples plot: monthly clusters
 dev.off()
 #par(mfrow=c(4,3))
-for(i in 1:5){
+df_res = data.frame()
+for(i in 1:12){
   print(i)
   plot(rr_monthly[[i]],main=names(rr_monthly)[i],tol.show=FALSE)
   tol.contour(rr_monthly[[i]]$P,levels=0.05,col="seagreen4",drawlabels=FALSE,add=TRUE,lwd=2)
   rho.class <- tol.classify(rr_monthly[[i]], cutoff = 0.05)
-  # ID <- 1:length(rho.class[["finsplit"]])       #cluster identifier
-  # Cases <- lengths(rho.class[["finsplit"]])     #case count
-  # Controls <- lengths(rho.class[["ginsplit"]])  #control count
-  # N <- Cases + Controls                         #point count
-  # Risk <- Cases/N                               #
+  ID <- 1:length(rho.class[["finsplit"]])       #cluster identifier
+  Cases <- lengths(rho.class[["finsplit"]])     #case count
+  Controls <- lengths(rho.class[["ginsplit"]])  #control count
+  N <- Cases + Controls                         #point count
+  Risk <- Cases/N                               #
+  #contours to sf
+  pcpolys <- rho.class$pcpolys %>%
+    lapply(., FUN = st_as_sf) %>%
+    do.call(rbind, .) %>%
+    st_set_crs(2263)
+  pcpolys$ID <- 1:length(rho.class[["finsplit"]])
+  pcpolys$month <- i
+  #st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
+  Area <- st_area(pcpolys) %>%
+    units::set_units(., value = km^2) #Takes care of units
+  Case_density <- Cases/Area                    
+  df_res <- rbind(df_res, data.frame(i, ID, N, Cases, Controls, Risk, Case_density, Area))
+  
 }
-
+#write.csv(df_res, "../output/clusters.csv", row.names = FALSE)
 
 # #read table
 # df <- read.csv("../data/NYPD_Arrests_Data__Historic__20241216.csv")   #source: https://s.cnmilf.com/user74170196/https/catalog.data.gov/dataset/nypd-arrest-data-year-to-date
