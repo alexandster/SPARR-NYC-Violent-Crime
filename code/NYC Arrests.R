@@ -70,7 +70,7 @@ sapply(ppjit0_monthly,NS) # around 2800
 sapply(ppjit1_monthly,NS) # around 3500
 sapply(ppjit01_monthly,LSCV.risk,method="kelsall-diggle") #  around 900
 
-rr_monthly <- lapply(ppjit01_monthly,risk,h0=2000,tolerate=TRUE)
+rr_monthly <- lapply(ppjit01_monthly,risk,h0=2000,tolerate=TRUE, res = 750)
 
 #small multiples plot: monthly clusters
 dev.off()
@@ -93,7 +93,7 @@ for(i in 1:12){
     st_set_crs(2263)
   pcpolys$ID <- 1:length(rho.class[["finsplit"]])
   pcpolys$month <- i
-  #st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
+  st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
   Area <- st_area(pcpolys) %>%
     units::set_units(., value = km^2) #Takes care of units
   Case_density <- Cases/Area                    
