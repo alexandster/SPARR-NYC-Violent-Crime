@@ -11,19 +11,22 @@ library(lubridate) # for 'month' and 'year'
 # set workspace----
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
-#read table
-df <- read.csv("../data/NYPD_Arrests_Data__Historic__20241216.csv")   #source: https://s.cnmilf.com/user74170196/https/catalog.data.gov/dataset/nypd-arrest-data-year-to-date
-df <- subset(df, Y_COORD_CD != 0 & ARREST_BORO == "M", select = c(ARREST_KEY, ARREST_DATE, OFNS_DESC, X_COORD_CD, Y_COORD_CD))
-df<-  na.omit(df) 
+# #read table
+# df <- read.csv("../data/NYPD_Arrests_Data__Historic__20241216.csv")   #source: https://s.cnmilf.com/user74170196/https/catalog.data.gov/dataset/nypd-arrest-data-year-to-date
+# df <- subset(df, Y_COORD_CD != 0 & ARREST_BORO == "M", select = c(ARREST_KEY, ARREST_DATE, OFNS_DESC, X_COORD_CD, Y_COORD_CD))
+# df<-  na.omit(df) 
+# 
+# #date format  
+# df$date <- as.Date(df$ARREST_DATE, "%m/%d/%Y")
+# 
+# #select 2023
+# df <- df %>%
+#   subset(., date >= "2023-01-01" & date <= "2023-12-31")
+# 
+# df$month <- month(df$date)
 
-#date format  
-df$date <- as.Date(df$ARREST_DATE, "%m/%d/%Y")
-
-#select 2023
-df <- df %>%
-  subset(., date >= "2023-01-01" & date <= "2023-12-31")
-
-df$month <- month(df$date)
+#save(df, file = "../data/df.RData", compress = TRUE)
+load("../data/df.RData")
 
 # time series plot
 p <- ggplot(df, aes(x=date)) +
