@@ -112,7 +112,7 @@ for(i in 1:12){
   r <- raster(rr_monthly[[i]]$rr)
   crs(r) <- 2263
   
-  writeRaster(r, paste0("../output/rho_", i), format = "GTiff", overwrite=TRUE)
+  #writeRaster(r, paste0("../output/rho_", i), format = "GTiff", overwrite=TRUE)
   
   # SPARR plotting
   #plot(rr_monthly[[i]],main=names(rr_monthly)[i],tol.show=FALSE)
@@ -157,7 +157,7 @@ for(i in 1:12){
   pcpolys$month <- i
   
   # write polygons to file
-  st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
+  #st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
   
   # polygon area
   Area <- st_area(pcpolys) %>%
@@ -170,4 +170,5 @@ for(i in 1:12){
   df_res <- rbind(df_res, data.frame(i, ID, N, Cases, Controls, Risk, Case_density, Area))
   
 }
-write.csv(df_res, "../output/clusters.csv", row.names = FALSE)
+#write.csv(df_res, "../output/clusters.csv", row.names = FALSE)
+

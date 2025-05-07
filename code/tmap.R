@@ -66,4 +66,32 @@ tm_list <- mapply(generate_tm, rasters, dfs, titles, SIMPLIFY = FALSE)
 # Arrange maps in a grid
 tm <- do.call(tmap_arrange, c(tm_list, list(ncol = 4, nrow = 3)))
 
-tmap_save(tm, "../small_multiples.jpg", width = 6.5, height = 8)
+#tmap_save(tm, "../small_multiples.jpg", width = 6.5, height = 8)
+
+#Jaccard Index
+
+#define sets of months
+set1 <- dfs[1:11]
+set2 <- dfs[2:12]
+
+#Jaccard function: intersect area / union area
+jac <- function(p1, p2) {
+  int <- st_intersection(p1, p2) %>%
+    st_area(.) %>%
+    sum(.)
+
+  uni <- st_union(st_union(p1), st_union(p2)) %>%
+    st_area(.) %>%
+    sum(.)
+
+  return(int/uni)
+}
+
+#for each month
+for (i in 1:11) {
+  print(jac(set1[[i]]$geometry, set2[[i]]$geometry))
+}
+  
+  
+
+
