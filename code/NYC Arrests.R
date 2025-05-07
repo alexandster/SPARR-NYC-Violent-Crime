@@ -37,7 +37,8 @@ table(df$OFNS_DESC)
 df$class <- ifelse(df$OFNS_DESC == "ASSAULT 3 & RELATED OFFENSES" | 
                      df$OFNS_DESC == "MURDER & NON-NEGL. MANSLAUGHTER" |
                      df$OFNS_DESC == "RAPE" |
-                     df$OFNS_DESC == "ROBBERY"
+                     df$OFNS_DESC == "ROBBERY" | 
+                     df$OFNS_DESC == "FELONY ASSAULT"
                    , 1, 0)
 
 #offense frequency
@@ -111,7 +112,7 @@ for(i in 1:12){
   r <- raster(rr_monthly[[i]]$rr)
   crs(r) <- 2263
   
-  #writeRaster(r, paste0("../output/rho_", i), format = "GTiff", overwrite=TRUE)
+  writeRaster(r, paste0("../output/rho_", i), format = "GTiff", overwrite=TRUE)
   
   # SPARR plotting
   #plot(rr_monthly[[i]],main=names(rr_monthly)[i],tol.show=FALSE)
@@ -155,8 +156,8 @@ for(i in 1:12){
   # polygon month
   pcpolys$month <- i
   
-  # write to file
-  #st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
+  # write polygons to file
+  st_write(pcpolys, paste0("../output/clusters_", i, ".shp"), append=FALSE)
   
   # polygon area
   Area <- st_area(pcpolys) %>%
@@ -169,4 +170,4 @@ for(i in 1:12){
   df_res <- rbind(df_res, data.frame(i, ID, N, Cases, Controls, Risk, Case_density, Area))
   
 }
-#write.csv(df_res, "../output/clusters.csv", row.names = FALSE)
+write.csv(df_res, "../output/clusters.csv", row.names = FALSE)
