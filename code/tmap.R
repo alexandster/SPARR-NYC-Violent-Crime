@@ -1,3 +1,12 @@
+# Install packages
+#install.packages("ggplot2")
+#install.packages("Kendall")
+#install.packages("zyp")
+
+# Load necessary libraries
+library(ggplot2)
+library(Kendall)
+library(zyp)
 library(tmap)
 library(sf)
 library(raster)
@@ -87,11 +96,14 @@ jac <- function(p1, p2) {
   return(int/uni)
 }
 
-#for each month
-for (i in 1:11) {
-  print(jac(set1[[i]]$geometry, set2[[i]]$geometry))
-}
+#output array
+out <- sapply(1:11, function(i) jac(set1[[i]]$geometry, set2[[i]]$geometry))
+ 
+print(out)
   
-  
+# Perform the Mann-Kendall Trend Test
+result <- MannKendall(out)
 
+# Print the result
+print(result)
 
